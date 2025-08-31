@@ -1,0 +1,159 @@
+import express from "express";
+import dotenv from "dotenv";
+dotenv.config();
+import { OpenAI } from "openai/client.js";
+
+const router = express.Router();
+
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+// Function to extract valid JSON from model response
+function extractJsonFromString(str) {
+  const cleaned = str
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```/, "")
+    .replace(/```$/, "")
+    .trim();
+
+  let start = cleaned.indexOf("{");
+  if (start === -1) throw new Error("No JSON start found.");
+
+  let depth = 0;
+  for (let i = start; i < cleaned.length; i++) {
+    if (cleaned[i] === "{") depth++;
+    else if (cleaned[i] === "}") depth--;
+
+    if (depth === 0) {
+      const candidate = cleaned.slice(start, i + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch (err) {
+        throw new Error("Found JSON block but it could not be parsed.");
+      }
+    }
+  }
+
+  throw new Error("Incomplete JSON object detected.");
+}
+
+// POST route to handle AI summary
+router.post("/get_ai_summary", async (req, res) => {
+  const {
+    make,
+    model,
+    year,
+    engineSize,
+    fuelType,
+    transmission,
+    mileage,
+    price,
+    doors,
+  } = req.body;
+
+  // Basic validation
+  if (!make || !model || !year || !price || !mileage) {
+    return res.status(400).json({ error: "Missing required fields." });
+  }
+
+  const prompt = `
+You are a UK car expert. All remarks should sound knowledgeable. You do not have to agree or disagree with the car. Be honest and truthful.
+If any units are mentioned they must be en-gb units.
+
+Given the following car details:
+Make: ${make}
+Model: ${model}
+Year: ${year}
+Engine Size: ${engineSize}
+Fuel Type: ${fuelType}
+Transmission: ${transmission}
+Mileage: ${mileage}
+Doors: ${doors}
+Price: ${price}
+
+Respond with JSON.
+Have a neutral view on the car, no bias. Your comments should be focused more on the car over the brand.
+Ratings are out of 10, comments should be 2 sentences at most.
+
+Respond ONLY with valid JSON matching this structure:
+
+{
+  "priceRating": 0,
+  "priceComment": "",
+  "comfortRating": 0,
+  "comfortComment": "",
+  "performanceRating": 0,
+  "performanceComment": "",
+  "reliabilityRating": 0,
+  "reliabilityComment": "",
+  "similarCars": ""
+}
+
+For reliability comment, include common faults and their cost. For price you should account for mileage.
+`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "openai/gpt-oss-20b:free",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a JSON generator. Respond only with a valid JSON object, no extra text. You must return valid compact JSON, without markdown or code fences.",
+        },
+        {
+          role: "user",
+          content: prompt.trim(),
+        },
+      ],
+      temperature: 0,
+    });
+
+    const raw = completion.choices?.[0]?.message?.content;
+    if (!raw) {
+      return res.status(500).json({ error: "No response from model." });
+    }
+
+    console.log("Raw model output:\n", raw);
+
+    // Try to parse JSON
+    let parsed;
+    try {
+      parsed = extractJsonFromString(raw);
+    } catch (err) {
+      console.error("JSON parse failed:", err.message);
+      return res.status(500).json({ error: "Failed to parse model response.", raw });
+    }
+
+    // Validate required keys exist
+    const requiredKeys = [
+      "priceRating",
+      "priceComment",
+      "comfortRating",
+      "comfortComment",
+      "performanceRating",
+      "performanceComment",
+      "reliabilityRating",
+      "reliabilityComment",
+      "similarCars",
+    ];
+    for (const key of requiredKeys) {
+      if (!(key in parsed)) {
+        return res.status(500).json({
+          error: `Missing key in AI response: ${key}`,
+          parsed,
+        });
+      }
+    }
+
+    return res.json(parsed);
+  } catch (error) {
+    console.error("Error in AI route:", error);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+export default router;
