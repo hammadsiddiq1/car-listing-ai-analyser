@@ -1,6 +1,5 @@
 function getVehicleInfo() {
-
-  // Get fields from HTML doc
+  // Get car props using test-id
   const makeModel =
     document.querySelector('[data-testid="advert-title"]')?.innerText || "";
   const modelVariant =
@@ -8,48 +7,74 @@ function getVehicleInfo() {
   const price =
     document.querySelector('[data-testid="advert-price"]')?.innerText || "";
 
-  // Engine size and doors are nested in multiple divs so we search through each inner div for "Engine"/"Doors"
-  const engineSize = [...document.querySelectorAll("div.bFkjBL")]
-    .find((div) => div.textContent.includes("Engine"))
-    ?.querySelector('[data-testid="details"]')
-    ?.textContent.trim();
-
-  const doors = [...document.querySelectorAll("div.bFkjBL")]
-    .find((div) => div.textContent.includes("Doors"))
-    ?.querySelector('[data-testid="details"]')
-    ?.textContent.trim();
-
-
-  // Mileage, fuel type, year and transmission all have the same id so we loop through each list item and search.
-  const items = document.querySelectorAll(
-    "ul.at__sc-1ebejir-0.nvjVA.ppa-enabled li"
+  // Select the list with engine size and door data
+  const dlLists = document.querySelectorAll(
+    'section[data-gui="key-specs-section"] dl'
   );
 
-  let mileage, yearReg, transmission, fuelType;
+  let engineSize = null;
+  let doors = null;
 
-  items.forEach((li) => {
-    const text = li.textContent.trim();
-    if (text.toLowerCase().includes("mile")) {
-      mileage = text;
-    } else if (text.includes("reg")) {
-      yearReg = text;
-    } else if (
-      text.toLowerCase().includes("manual") ||
-      text.toLowerCase().includes("auto")
-    ) {
-      transmission = text;
-    } else if (
-      text.toLowerCase().includes("petrol") ||
-      text.toLowerCase().includes("diesel") ||
-      text.toLowerCase().includes("hybrid") ||
-      text.toLowerCase().includes("natural gas") ||
-      text.toLowerCase().includes("hydrogen") ||
-      text.toLowerCase().includes("bi fuel") ||
-      text.toLowerCase().includes("electric")
-    ) {
-      fuelType = text;
-    }
+  // Loop through the contents of this div
+  dlLists.forEach((dl) => {
+    const items = dl.querySelectorAll(":scope > div");
+
+    items.forEach((item) => {
+      const label = item.querySelector(".term_details")?.textContent?.trim();
+      const value = item
+        .querySelector('[data-testid="details"]')
+        ?.textContent?.trim();
+
+      if (!label || !value) return;
+
+      // Engine size and doors properties are displayed in key value pairs on the Autotrader website
+      // Find label and then get val
+      if (label.toLowerCase() === "engine") {
+        engineSize = value;
+      } else if (label.toLowerCase() === "doors") {
+        doors = value;
+      }
+    });
   });
+
+  // Mileage, year, transmission, fuel all contained within a <ul>. Loop through each list item and extract fields
+  const ulList = [...document.querySelectorAll("ul")].find(
+    (ul) => ul.children.length === 4
+  );
+
+  let mileage = "";
+  let yearReg = "";
+  let transmission = "";
+  let fuelType = "";
+
+  if (ulList) {
+    [...ulList.children].forEach((li) => {
+      const text = li.textContent.trim();
+
+      if (text.toLowerCase().includes("mile")) {
+        mileage = text;
+      } else if (/\d{4}\s*\(\d{2}\s*reg\)/.test(text)) {
+        yearReg = text.match(/\d{4}/)[0]; // just the year
+      } else if (
+        text.toLowerCase().includes("manual") ||
+        text.toLowerCase().includes("auto")
+      ) {
+        transmission = text;
+      } else if (
+        [
+          "petrol",
+          "diesel",
+          "hybrid",
+          "natural gas",
+          "hydrogen",
+          "bi fuel",
+          "electric",
+        ].some((f) => text.toLowerCase().includes(f))
+      ) {
+        fuelType = text;
+      }
+    });
+  }
 
   return {
     makeModel,
@@ -64,9 +89,25 @@ function getVehicleInfo() {
   };
 }
 
-// Listen for incoming requests
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// TEST TO SEE IF UI COMMUNICATES TO THIS SCRIPT
+
+// function getVehicleInfo() {
+//   return {
+//     makeModel: "h",
+//     modelVariant: "a",
+//     yearReg: 17,
+//     price: 4000,
+//     mileage: "1 mile",
+//     engineSize: "2.0",
+//     fuelType: "petrol",
+//     transmission: "manual",
+//     doors: 4,
+//   };
+// }
+
+// Listen for incoming reqs
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === "getVehicleInfo") {
     sendResponse(getVehicleInfo());
   }
