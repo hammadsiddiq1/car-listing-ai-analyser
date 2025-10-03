@@ -60,39 +60,50 @@ router.post("/get_ai_summary", async (req, res) => {
   }
 
   const prompt = `
-You are a UK car expert. All remarks should sound knowledgeable. You do not have to agree or disagree with the car. Be honest and truthful.
-If any units are mentioned they must be en-gb units.
+You are a UK car expert. Evaluate cars objectively based on the details provided.  
+All units must use UK measurement standards. Your responses must be fact-based, neutral, and focused on the car rather than the brand.  
 
-Given the following car details:
-Make: ${make}
-Model: ${model}
-Year: ${year}
-Engine Size: ${engineSize}
-Fuel Type: ${fuelType}
-Transmission: ${transmission}
-Mileage: ${mileage}
-Doors: ${doors}
+Given the following car details: 
+Make: ${make} 
+Model: ${model} 
+Year: ${year} 
+Engine Size: ${engineSize} 
+Fuel Type: ${fuelType} 
+Transmission: ${transmission} 
+Mileage: ${mileage} 
+Doors: ${doors} 
 Price: ${price}
 
-Respond with JSON.
-Have a neutral view on the car, no bias. Your comments should be focused more on the car over the brand.
-Ratings are out of 10, comments should be 2 sentences at most.
+Follow these guidelines carefully:  
 
-Respond ONLY with valid JSON matching this structure:
+1. **Ratings**: Provide integer ratings from 0 to 10 for price, comfort, performance, and reliability.  
+2. **Comments**: Each comment must be a maximum of two sentences, concise and informative.  
+3. **Price**: Evaluate the value for money, taking into account the car’s mileage and typical UK market pricing.  
+4. **Comfort**: Assess interior space, seating, ride quality, and ergonomics.  
+5. **Performance**: Assess engine, transmission, handling, and fuel efficiency.  
+6. **Reliability**: Mention known common faults and approximate UK repair costs if applicable. If no major recurring issues are known, state that explicitly.  
+7. **SimilarCars**: Provide a comma-separated list of 2–3 comparable cars available in the UK market.  
+
+**Output Format:** The response must strictly follow this JSON schema, with no extra text, formatting, or commentary outside of the JSON object:
 
 {
-  "priceRating": 0,
-  "priceComment": "",
-  "comfortRating": 0,
-  "comfortComment": "",
-  "performanceRating": 0,
-  "performanceComment": "",
-  "reliabilityRating": 0,
-  "reliabilityComment": "",
-  "similarCars": ""
+  "priceRating": 0,             // Integer 0–10
+  "priceComment": "",            // Max 2 sentences
+  "comfortRating": 0,           // Integer 0–10
+  "comfortComment": "",          // Max 2 sentences
+  "performanceRating": 0,       // Integer 0–10
+  "performanceComment": "",      // Max 2 sentences
+  "reliabilityRating": 0,       // Integer 0–10
+  "reliabilityComment": "",      // Max 2 sentences, include faults and costs if known
+  "similarCars": ""              // Comma-separated list of 2–3 comparable cars in the UK
 }
 
-For reliability comment, include common faults and their cost. For price you should account for mileage.
+**Requirements:**  
+- Use UK spelling and units.  
+- Do not add any explanations, text, or commentary outside of the JSON.  
+- Keep all comments objective, neutral, and focused on the car itself.  
+- Always provide complete JSON even if some data is unknown; fill unknowns with an honest statement.  
+
 `;
 
   try {
@@ -125,7 +136,9 @@ For reliability comment, include common faults and their cost. For price you sho
       parsed = extractJsonFromString(raw);
     } catch (err) {
       console.error("JSON parse failed:", err.message);
-      return res.status(500).json({ error: "Failed to parse model response.", raw });
+      return res
+        .status(500)
+        .json({ error: "Failed to parse model response.", raw });
     }
 
     // Validate required keys exist
