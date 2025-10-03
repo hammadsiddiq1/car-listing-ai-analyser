@@ -15,15 +15,15 @@ Toggle developer mode (top right). </br>
 Click the "Load unpacked" button and select the ```dist``` folder.
 The extension should appear under "All extenstions".
 ***
+_Add in a ```.env``` file in the ```/backend``` directory containing the following: </br> </br>
+PORT=3000 (or any desired port) </br>
+OPENROUTER_API_KEY=[**YOUR_OPENROUTER_API_KEY**]_</br> </br>
+***
 Run the following command in the directory labeled backend
 ```
 npm run dev
 ```
-This command runs the backend server which communicates to a LLM (default LLM is openai/gpt-oss-20b:free). _The backend server must be running in order for the extention to function properly, feel free to host the backend (via render or any other hosting platform)._
-***
-_Add in a ```.env``` file in the ```/backend``` directory containing the following: </br> </br>
-PORT=3000 (or any desired port) </br>
-OPENROUTER_API_KEY=[**YOUR_OPENROUTER_API_KEY**]_</br> </br>
+This command runs the backend server which communicates to a LLM (default LLM is openai/gpt-oss-20b:free). _The backend server must be running in order for the extension to function properly, feel free to host the backend (via render or any other hosting platform)._
 **The extension is now ready to use.**
 ## How it works
 ### Frontend
